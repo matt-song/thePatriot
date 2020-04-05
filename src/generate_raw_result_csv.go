@@ -65,7 +65,7 @@ func checkRequirement() {
 func mtrTest(urls []string, outputFolder string) {
 
 	curTime := time.Now()
-	nowDate := curTime.Format("2006-01-01_12-01")
+	nowDate := curTime.Format("2006-01-01_15-04-05")
 	outputFile := outputFolder + "/" + "speedTestReport_" + nowDate + ".csv"
 	plog("DEBUG", "The output file is ["+outputFile+"]")
 
@@ -73,8 +73,8 @@ func mtrTest(urls []string, outputFolder string) {
 		targetSite := strings.Split(url, "/")[2]
 		// plog("INFO", "Working on site: ["+targetSite+"]...")
 		plog("INFO", "Calling mtr to test the speed of site: ["+targetSite+"]...")
-		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c 2 -C" // send 60 pings to target site
-		resultCSV := runCommand(testCommand, false)
+		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c 60 -C | grep -v \"^Mtr_Version\" " // send 60 pings to target site
+		resultCSV := runCommand(testCommand, false) + "\n"
 
 		/* write the output to outputFile */
 		fd, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -88,6 +88,7 @@ func mtrTest(urls []string, outputFolder string) {
 		}
 	}
 	plog("INFO", "All done, please review the output file: ["+outputFile+"]!")
+	/*csv header: Mtr_Version,Start_Time,Status,Host,Hop,Ip,Loss%,Snt, ,Last,Avg,Best,Wrst,StDev, */
 }
 func getURL() (listOfURL []string) {
 
