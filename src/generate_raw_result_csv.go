@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,23 +12,23 @@ import (
 
 var (
 	enableDebug = false // default disable debug mode, unless use -D
-	_MTR        = ""
+	mtrFolder   = ""
 	outputFile  = ""
 )
 
 func init() {
 
-	// get the options
+	/* get the options */
 	optDebug := getopt.Bool('D', "Display debug message") // enable DEBUG mode
 	optHelp := getopt.Bool('h', "Help")                   // print the help message
 	// optUrl := getopt.String('l', "the link from the vultr which contain the site list")
-	optMtr := getopt.String('b', "/usr/sbin/mtr", "path to mtr binary, default: /usr/local/sbin/mtr") // mtr utility
-	optOutput := getopt.String('o', "./speedTest.$$.out", "the output of the result")
+	optMtrFolder := getopt.String('b', "/usr/local/sbin", "Folder which holds the mtr binary, default:") // mtr utility
+	optOutputFolder := getopt.String('o', ".", "The output of the result, default:")
 
 	getopt.Parse()
 	enableDebug = *optDebug
-	_MTR = *optMtr
-	outputFile = *optOutput
+	mtrFolder = *optMtrFolder
+	outputFile = *optOutputFolder
 	if *optHelp {
 		getopt.Usage()
 		os.Exit(0)
@@ -39,44 +38,56 @@ func main() {
 
 	// step1: TBD, checking if the required tools like mtr has been installed
 	checkRequirement()
+
 	// step2: get the url list from vultr.com
-	allTestLink := getURL() // the link url is like: https://par-fr-ping.vultr.com/vultr.com.100MB.bin
+	allTestLink := getURL()
 
-	// step3: run mtr against all site, save the result to csv
+	// step3: run mtr against all site, save the result to csv. this has to be done at local mac so the result is real
 	mtrTest(allTestLink, outputFile)
-
 }
 
 /* checking if the required tools has been installed */
 func checkRequirement() {
 	plog("INFO", "Checking if we have installed MTR...")
-	if len(_MTR) > 0 {
-		plog("INFO", "searching path: ["+_MTR+"]...")
-		testMtrCommand := _MTR + " --version"
+	if len(mtrFolder) > 0 {
+		plog("INFO", "searching mtr under: ["+mtrFolder+"]...")
+		testMtrCommand := "cd " + mtrFolder + ";" + mtrFolder + "/mtr --version"
 		result := runCommand(testMtrCommand, false)
 		if len(result) == 0 {
 			plog("FATAL", "Unable to find mtr binary, please specific the path by adding -b [/path/to/mtr] option.")
+		} else {
+			plog("INFO", "Found the mtr binary under ["+mtrFolder+"]!")
 		}
 	}
 }
 
 /* test the speed with mtr against each site of the url, save the output into local storage as csv format */
-func mtrTest(urls []string, outputFile string) {
+func mtrTest(urls []string, outputFolder string) {
+
+	curTime := time.Now()
+	nowDate := curTime.Format("2006-01-01_12-01")
+	outputFile := outputFolder + "/" + "speedTestReport_" + nowDate + ".csv"
+	plog("DEBUG", "The output file is ["+outputFile+"]")
 
 	for _, url := range urls {
 		targetSite := strings.Split(url, "/")[2]
-		plog("INFO", "Working on site: ["+targetSite+"]...")
+		// plog("INFO", "Working on site: ["+targetSite+"]...")
 		plog("INFO", "Calling mtr to test the speed of site: ["+targetSite+"]...")
-		// send 60 pings to target site
-		testCommand := "sudo " + _MTR + " " + targetSite + " -r -w -c 60 -C"
+		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c 2 -C" // send 60 pings to target site
 		resultCSV := runCommand(testCommand, false)
-		message := []byte(resultCSV)
-		err := ioutil.WriteFile("outputFile", message, 0644)
+
+		/* write the output to outputFile */
+		fd, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
-			plog("FATAL", "Failed to write to output file ["+outputFile+"], reason: ["+err.Error()+"]")
+			plog("FATAL", "Failed to open the output file ["+outputFile+"], reason: ["+err.Error()+"]")
+		}
+		message := []byte(resultCSV)
+		if _, err := fd.Write(message); err != nil {
+			fd.Close() // ignore error; Write error takes precedence
+			plog("FATAL", "Failed to write to the output file ["+outputFile+"], reason: ["+err.Error()+"]")
 		}
 	}
-
+	plog("INFO", "All done, please review the output file: ["+outputFile+"]!")
 }
 func getURL() (listOfURL []string) {
 
