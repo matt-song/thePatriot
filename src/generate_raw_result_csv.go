@@ -1,12 +1,24 @@
+/*
+TBD:
+1. change the program from single thread to muliple thread.
+2. find a better way to import the csv to db
+3. consider to get rid of gpdb, use local db file instead.
+4. re-write the sql so it can only query the current date (where date=xxxxx)
+5. remove the minLoss column, its useless (local site always 0)
+*/
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/pborman/getopt/v2"
 )
 
@@ -14,21 +26,38 @@ var (
 	enableDebug = false // default disable debug mode, unless use -D
 	mtrFolder   = ""
 	outputFile  = ""
+	dbName      = ""
+	dbHost      = ""
+	dbUser      = ""
+	dbPassword  = ""
+	dbPort      = ""
 )
 
 func init() {
 
 	/* get the options */
 	optDebug := getopt.Bool('D', "Display debug message") // enable DEBUG mode
-	optHelp := getopt.Bool('h', "Help")                   // print the help message
+	optHelp := getopt.Bool('H', "Help")                   // print the help message
 	// optUrl := getopt.String('l', "the link from the vultr which contain the site list")
 	optMtrFolder := getopt.String('b', "/usr/local/sbin", "Folder which holds the mtr binary, default:") // mtr utility
 	optOutputFolder := getopt.String('o', ".", "The output of the result, default:")
+	// db connection info:
+	optDBName := getopt.String('d', "thePatriot", "Database to connect")
+	optDBHost := getopt.String('h', "aio1", "Database to connect")
+	optDBUser := getopt.String('u', "gpadmin", "dbuser")
+	optDBPassword := getopt.String('p', "abc123", "password")
+	optDBPort := getopt.String('P', "5432", "port of DB")
 
 	getopt.Parse()
 	enableDebug = *optDebug
 	mtrFolder = *optMtrFolder
 	outputFile = *optOutputFolder
+	dbName = *optDBName
+	dbHost = *optDBHost
+	dbUser = *optDBUser
+	dbPassword = *optDBPassword
+	dbPort = *optDBPort
+
 	if *optHelp {
 		getopt.Usage()
 		os.Exit(0)
@@ -43,7 +72,58 @@ func main() {
 	allTestLink := getURL()
 
 	// step3: run mtr against all site, save the result to csv. this has to be done at local mac so the result is real
-	mtrTest(allTestLink, outputFile)
+	csvReport := mtrTest(allTestLink, outputFile)
+
+	// step4: load the data into db and get the result
+	generateReport(csvReport)
+}
+
+func generateReport(csvFile string) {
+
+	DBconnStr := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " dbname=" + dbName + " password=" + dbPassword + " sslmode=disable"
+	plog("DEBUG", "The DB conn string is: "+DBconnStr)
+	plog("INFO", "Connecting to DB...")
+
+	db, err := sql.Open("postgres", DBconnStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	/* Import the csv */
+	CsvFileBase := filepath.Base(csvFile)
+	scpCommand := "scp " + csvFile + " " + dbUser + "@" + dbHost + ":/tmp/" + CsvFileBase
+	runCommand(scpCommand, true)
+	_, importErr := db.Query("copy test_report from '/tmp/" + CsvFileBase + "' csv")
+	if importErr != nil {
+		log.Fatal(importErr)
+	} else {
+		plog("INFO", "CSV file has been imported, generating report now...")
+	}
+
+	// generate the result
+	query := `select
+	host, 
+	min(lossrate) as min_lossrate, 
+	max(lossrate) as max_lossrate, 
+	avg(lossrate)::numeric(100,2) as avg_lossrate, 
+	max(worst) as max_worst, 
+	max(avg) as max_avg_ping 
+	from test_report  
+		where ip != '???' group by host order by 3`
+
+	rows, queryErr := db.Query(query)
+	if queryErr != nil {
+		log.Fatal(queryErr)
+	}
+	var host, minLoss, maxLoss, avgLoss, maxWorstPing, avgWorstPing string
+	fmt.Printf("%-30s %10s %10s %10s %10s %10s\n", "HostName", "minLoss", "maxLoss", "avgLoss", "maxWorstPing", "avgWorstPing")
+	for rows.Next() {
+		err = rows.Scan(&host, &minLoss, &maxLoss, &avgLoss, &maxWorstPing, &avgWorstPing)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%-30s %10s %10s %10s %10s %10s\n", host, minLoss, maxLoss, avgLoss, maxWorstPing, avgWorstPing)
+	}
 }
 
 /* checking if the required tools has been installed */
@@ -62,7 +142,7 @@ func checkRequirement() {
 }
 
 /* test the speed with mtr against each site of the url, save the output into local storage as csv format */
-func mtrTest(urls []string, outputFolder string) {
+func mtrTest(urls []string, outputFolder string) (csvFile string) {
 
 	curTime := time.Now()
 	nowDate := curTime.Format("2006-01-01_15-04-05")
@@ -89,10 +169,11 @@ func mtrTest(urls []string, outputFolder string) {
 	}
 	plog("INFO", "All done, please review the output file: ["+outputFile+"]!")
 	/*csv header: Mtr_Version,Start_Time,Status,Host,Hop,Ip,Loss%,Snt, ,Last,Avg,Best,Wrst,StDev, */
+	return outputFile
 }
 func getURL() (listOfURL []string) {
 
-	plog("INFO", "Getting the URL list...")
+	plog("INFO", "Getting the URL list, please input the password for sudo when prompt...")
 	cmd := "curl -s https://www.vultr.com/resources/faq/#downloadspeedtests | grep 100MB | awk -F 'href=' '{print $2}' | grep -v ipv6 | grep https | awk '{print $1}' | sed 's/\\\"//g'"
 	curlOutput := runCommand(cmd, true)
 	if len(curlOutput) == 0 {
