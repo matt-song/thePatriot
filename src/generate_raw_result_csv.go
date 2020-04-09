@@ -4,17 +4,18 @@ TBD:
 2. find a better way to import the csv to db
 3. consider to get rid of gpdb, use local db file instead.
 4. re-write the sql so it can only query the current date (where date=xxxxx)
-5. remove the minLoss column, its useless (local site always 0)
+5. adding download speed test
 */
 package main
 
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,14 +24,18 @@ import (
 )
 
 var (
-	enableDebug = false // default disable debug mode, unless use -D
-	mtrFolder   = ""
-	outputFile  = ""
-	dbName      = ""
-	dbHost      = ""
-	dbUser      = ""
-	dbPassword  = ""
-	dbPort      = ""
+	enableDebug         = false // default disable debug mode, unless use -D
+	mtrFolder           = ""
+	outputFile          = ""
+	dbName              = ""
+	dbHost              = ""
+	dbUser              = ""
+	dbPassword          = ""
+	dbPort              = ""
+	db                  *sql.DB
+	mtrReportTable      = "mtr_report"
+	downloadReportTable = "download_report"
+	reportTable         = "final_report"
 )
 
 func init() {
@@ -65,6 +70,7 @@ func init() {
 }
 func main() {
 
+	testTime := time.Now().Format("2006-01-02 15:04:00")
 	// step1: TBD, checking if the required tools like mtr has been installed
 	checkRequirement()
 
@@ -74,55 +80,144 @@ func main() {
 	// step3: run mtr against all site, save the result to csv. this has to be done at local mac so the result is real
 	csvReport := mtrTest(allTestLink, outputFile)
 
-	// step4: load the data into db and get the result
-	generateReport(csvReport)
+	// stepx: connect to db
+	connectDB()
+
+	// stepx: load the csv to DB
+	loadCsvToDB(csvReport)
+
+	// stepx: test the speed of the download against each site
+	testDownloadSpeed(allTestLink, testTime)
+
+	// step5: load the data into db and get the result
+	generateReport(csvReport, testTime)
+
 }
 
-func generateReport(csvFile string) {
+func connectDB() {
 
 	DBconnStr := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " dbname=" + dbName + " password=" + dbPassword + " sslmode=disable"
 	plog("DEBUG", "The DB conn string is: "+DBconnStr)
-	plog("INFO", "Connecting to DB...")
+	plog("INFO", "Connecting to DB ["+dbName+"]...")
 
-	db, err := sql.Open("postgres", DBconnStr)
+	dbConn, err := sql.Open("postgres", DBconnStr)
 	if err != nil {
-		log.Fatal(err)
+		plog("FATAL", err.Error())
 	}
+	db = dbConn
+}
+
+func loadCsvToDB(csvFile string) {
 
 	/* Import the csv */
 	CsvFileBase := filepath.Base(csvFile)
 	scpCommand := "scp " + csvFile + " " + dbUser + "@" + dbHost + ":/tmp/" + CsvFileBase
 	runCommand(scpCommand, true)
-	_, importErr := db.Query("copy test_report from '/tmp/" + CsvFileBase + "' csv")
-	if importErr != nil {
-		log.Fatal(importErr)
-	} else {
-		plog("INFO", "CSV file has been imported, generating report now...")
-	}
 
-	// generate the result
-	query := `select
-	host, 
-	min(lossrate) as min_lossrate, 
-	max(lossrate) as max_lossrate, 
-	avg(lossrate)::numeric(100,2) as avg_lossrate, 
-	max(worst) as max_worst, 
-	max(avg) as max_avg_ping 
-	from test_report  
-		where ip != '???' group by host order by 3`
-
-	rows, queryErr := db.Query(query)
-	if queryErr != nil {
-		log.Fatal(queryErr)
+	runQueryWithNoOutput("truncate " + mtrReportTable)
+	copyQuery := "copy " + mtrReportTable + " from '/tmp/" + CsvFileBase + "' csv"
+	runQueryWithNoOutput(copyQuery)
+}
+func runQueryWithNoOutput(query string) {
+	plog("DEBUG", "will run query: ["+query+"]...")
+	_, error := db.Query(query)
+	if error != nil {
+		plog("FATAL", "Failed to run the query ["+query+"], error: "+error.Error())
 	}
-	var host, minLoss, maxLoss, avgLoss, maxWorstPing, avgWorstPing string
-	fmt.Printf("%-30s %10s %10s %10s %10s %10s\n", "HostName", "minLoss", "maxLoss", "avgLoss", "maxWorstPing", "avgWorstPing")
-	for rows.Next() {
-		err = rows.Scan(&host, &minLoss, &maxLoss, &avgLoss, &maxWorstPing, &avgWorstPing)
-		if err != nil {
-			log.Fatal(err)
+}
+
+func testDownloadSpeed(targetSites []string, testTimeStamp string) {
+
+	testDuration := 10 // test download for x secs
+	downloadSpeed := "n/a"
+	var fileSize = 100 * 1024 * 1024 // 100 MB
+
+	/* create a work folder */
+	workFolder := fmt.Sprintf("/tmp/.testSpeed.%d", os.Getpid())
+	plog("INFO", "Start to testing the download speed, creating the temp folder ["+workFolder+"]...")
+	err := os.MkdirAll(workFolder, 0755)
+	if err != nil {
+		plog("FATAL", "Failed to create temp folder ["+workFolder+"], exit!")
+	}
+	defer os.RemoveAll(workFolder) // clean the work folder if abnormally exit
+
+	runQueryWithNoOutput("truncate " + downloadReportTable)
+	for _, testURL := range targetSites {
+
+		hostName := strings.Split(testURL, "/")[2]
+		// fmt.Println(testUrl)
+		plog("INFO", "Tesring download speed of ["+hostName+"]...")
+		getFileCMD := "curl " + testURL + " -o /dev/null -m " + strconv.Itoa(testDuration) + " 2>&1 | grep 'Operation timed out'"
+		downloadSummary := runCommand(getFileCMD, false)
+
+		if len(downloadSummary) == 0 { // download finished within x sec
+			downloadSpeed = string(fileSize / testDuration / 1024)
+		} else {
+			downloadedSizeString := strings.Split(downloadSummary, " ")[9]
+			// check if the output is number
+			match, _ := regexp.MatchString("([0-9]+)", downloadedSizeString)
+			if match {
+				downloadedSize, _ := strconv.Atoi(downloadedSizeString)
+				downloadSpeed = strconv.Itoa(downloadedSize / testDuration / 1024)
+			} else {
+				plog("ERROR", "Failed to get download speed for site ["+testURL+"]...")
+			}
 		}
-		fmt.Printf("%-30s %10s %10s %10s %10s %10s\n", host, minLoss, maxLoss, avgLoss, maxWorstPing, avgWorstPing)
+		insertQuery := "insert into " + downloadReportTable + " values('" + testTimeStamp + "', '" + hostName + "','" + downloadSpeed + "')"
+		runQueryWithNoOutput(insertQuery)
+	}
+
+}
+
+func generateReport(csvFile string, date string) {
+
+	InsertReportQuery := `insert into ` + reportTable + ` 
+    select 
+        to_timestamp(testdate, 'YYYY-MM-DD HH24:MI')::timestamp as testDate,
+        hostname,
+        result::int as Speed,
+        avg_lossrate,
+        max_lossrate,
+        max_latency,
+        avg_latency
+    from 
+        (select host as hostname,
+            max(lossrate) as max_lossrate, 
+            avg(lossrate)::numeric(100,2) as avg_lossrate, 
+            max(worst) as max_latency, 
+            max(avg) as avg_latency
+            from ` + mtrReportTable + `
+            where ip != '???' 
+            group by host ) m,
+        ` + downloadReportTable + ` d
+    where d.host = m.hostname 
+	order by max_lossrate,Speed;`
+	runQueryWithNoOutput(InsertReportQuery)
+
+	getReportQuery := `select 
+		hostname,
+		speed,
+		avg_lossrate,
+		max_lossrate,
+		avg_latency,
+		max_latency 
+	from ` + reportTable + ` 
+	where testdate = '` + date + `'
+	order by 2 desc,4`
+
+	plog("DEBUG", "will run query ["+getReportQuery+"]")
+	rows, queryErr := db.Query(getReportQuery)
+	if queryErr != nil {
+		plog("FATAL", queryErr.Error())
+	}
+	var host, speed, avgLoss, maxLoss, avgLatency, maxLatency string
+	fmt.Printf("%-30s %15s %15s %15s %15s %15s\n", "HostName", "speed(KB/s)", "avgLossRate", "maxLossRate", "avgLatency", "maxLatency")
+	for rows.Next() {
+		err := rows.Scan(&host, &speed, &avgLoss, &maxLoss, &avgLatency, &maxLatency)
+		if err != nil {
+			plog("FATAL", err.Error())
+		}
+		fmt.Printf("%-30s %15s %15s %15s %15s %15s\n", host, speed, avgLoss, maxLoss, avgLatency, maxLatency)
 	}
 }
 
