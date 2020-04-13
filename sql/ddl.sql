@@ -1,6 +1,3 @@
--- Mtr_Version,Start_Time,Status,Host,Hop,Ip,Loss%,Snt, ,Last,Avg,Best,Wrst,StDev,
--- MTR.UNKNOWN,1586138816,OK,nj-us-ping.vultr.com,5,219.158.6.189,0.00,60,0,31.63,28.55,24.39,32.38,2.25
-
 \c thePatriot
 
 drop table if exists mtr_report;
@@ -43,25 +40,5 @@ create table final_report (
 
 
 /* -- query -- 
-insert into final_report 
-    select 
-        to_timestamp(testdate, 'YYYY-MM-DD HH24:MI')::timestamp as testDate,
-        hostname,
-        result::int as Speed,
-        avg_lossrate,
-        max_lossrate,
-        max_latency,
-        avg_latency
-    from 
-        (select host as hostname,
-            max(lossrate) as max_lossrate, 
-            avg(lossrate)::numeric(100,2) as avg_lossrate, 
-            max(worst) as max_latency, 
-            max(avg) as avg_latency
-            from mtr_report
-            where ip != '???' 
-            group by host ) m,
-        download_report d 
-    where d.host = m.hostname 
-    order by max_lossrate,Speed;
+
 */
