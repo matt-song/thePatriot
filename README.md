@@ -37,7 +37,7 @@ speedtest.atlanta.linode.com                 6            0.00            0.00  
 speedtest.frankfurt.linode.com               5            0.00            0.00          419.28          419.28```
 ```
 
-## to query the histrionic data 
+## to query the historical data 
 ```
 # select * from final_report where vendor = 'linode' and hostname = 'speedtest.tokyo2.linode.com' order by 1;
       testdate       | vendor |          hostname           | speed | avg_lossrate | max_lossrate | avg_latency | max_latency
