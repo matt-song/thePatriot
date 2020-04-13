@@ -3,6 +3,7 @@ TBD:
 1. change the program from single thread to muliple thread.
 2. find a better way to import the csv to db
 3. consider to get rid of gpdb, use local db file instead.
+4. add support for Bandwagonhost and DigitalOcean
 */
 package main
 
@@ -40,12 +41,12 @@ var (
 func init() {
 
 	/* get the options */
-	optDebug := getopt.Bool('D', "Display debug message") // enable DEBUG mode
-	optHelp := getopt.Bool('H', "Help")                   // print the help message
-	// optUrl := getopt.String('l', "the link from the vultr which contain the site list")
-	optMtrFolder := getopt.String('b', "/usr/local/sbin", "Folder which holds the mtr binary, default:") // mtr utility
+	optDebug := getopt.Bool('D', "Display debug message")                                                // enable DEBUG mode
+	optHelp := getopt.Bool('H', "Help")                                                                  // print the help message
+	optMtrFolder := getopt.String('b', "/usr/local/sbin", "Folder which holds the mtr binary, default:") // path of mtr utility
 	optOutputFolder := getopt.String('o', ".", "The location of the csv file, default:")
-	// db connection info:
+
+	/* db connection info: */
 	optDBName := getopt.String('d', "thePatriot", "Database to connect, default:")
 	optDBHost := getopt.String('h', "aio1", "Database to connect, default:")
 	optDBUser := getopt.String('u', "gpadmin", "the user of DB, default:")
@@ -148,15 +149,13 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string
 		switch vendor {
 		case "vultr":
 			plog("INFO", "testing download speed for link: "+testURL)
-		case "linode": // http://speedtest.toronto1.linode.com  -> http://speedtest.mumbai1.linode.com/100MB-mumbai1.bin
+		case "linode": // http://speedtest.toronto1.linode.com  -> http://speedtest.toronto1.linode.com/100MB-toronto1.bin
 			fileName := strings.Split(testURL, ".")[1]
 			testURL = testURL + "/100MB-" + fileName + ".bin"
 		default:
 			plog("FATAL", "unsupported vendor ["+vendor+"], exit!")
 		}
 		hostName := strings.Split(testURL, "/")[2]
-		// fmt.Println(testUrl)
-		plog("INFO", "Tesring download speed of ["+hostName+"]...")
 		getFileCMD := "curl " + testURL + " -o /dev/null -m " + strconv.Itoa(testDuration) + " 2>&1 | grep 'Operation timed out'"
 		downloadSummary := runCommand(getFileCMD, false)
 
