@@ -44,14 +44,14 @@ func init() {
 	optHelp := getopt.Bool('H', "Help")                   // print the help message
 	// optUrl := getopt.String('l', "the link from the vultr which contain the site list")
 	optMtrFolder := getopt.String('b', "/usr/local/sbin", "Folder which holds the mtr binary, default:") // mtr utility
-	optOutputFolder := getopt.String('o', ".", "The output of the result, default:")
+	optOutputFolder := getopt.String('o', ".", "The location of the csv file, default:")
 	// db connection info:
-	optDBName := getopt.String('d', "thePatriot", "Database to connect")
-	optDBHost := getopt.String('h', "aio1", "Database to connect")
-	optDBUser := getopt.String('u', "gpadmin", "dbuser")
-	optDBPassword := getopt.String('p', "abc123", "password")
-	optDBPort := getopt.String('P', "5432", "port of DB")
-	optVendor := getopt.String('v', "vultr", "the vendor of the VPS, default is vultr")
+	optDBName := getopt.String('d', "thePatriot", "Database to connect, default:")
+	optDBHost := getopt.String('h', "aio1", "Database to connect, default:")
+	optDBUser := getopt.String('u', "gpadmin", "the user of DB, default:")
+	optDBPassword := getopt.String('p', "abc123", "the password of DB user, default:")
+	optDBPort := getopt.String('P', "5432", "the port of DB, default:")
+	optVendor := getopt.String('v', "vultr", "the vendor of the VPS, default:")
 
 	getopt.Parse()
 	enableDebug = *optDebug

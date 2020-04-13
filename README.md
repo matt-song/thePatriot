@@ -30,16 +30,16 @@ Usage: generate_raw_result_csv [-DH] [-b value] [-d value] [-h value] [-o value]
  -b value  Folder which holds the mtr binary, default:
            [/usr/local/sbin]
  -D        Display debug message
- -d value  Database to connect [thePatriot]
+ -d value  Database to connect, default: [thePatriot]
  -H        Help
- -h value  Database to connect [aio1]
- -o value  The output of the result, default: [.]
- -P value  port of DB [5432]
- -p value  password [abc123]
- -u value  dbuser [gpadmin]
- -v value  the vendor of the VPS, default is vultr [vultr]
+ -h value  Database to connect, default: [aio1]
+ -o value  The location of the csv file, default: [.]
+ -P value  the port of DB, default: [5432]
+ -p value  the password of DB user, default: [abc123]
+ -u value  the user of DB, default: [gpadmin]
+ -v value  the vendor of the VPS, default: [vultr]
  ```
-
+ 
 ## Example output 
 ```
 HostName                           speed(KB/s)     avgLossRate     maxLossRate      avgLatency      maxLatency
