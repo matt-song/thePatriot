@@ -5,6 +5,9 @@ TBD:
 3. consider to get rid of gpdb, use local db file instead.
 4. re-write the sql so it can only query the current date (where date=xxxxx)
 5. adding download speed test
+6. adding test for linnode
+ curl -s https://www.linode.com/speed-test/ | grep o-button | grep 'speedtest'  | awk '{print $4}' | awk -F'=' '{print $2}' | sed 's/\"//g' | sed 's/\/$//g'
+http://speedtest.mumbai1.linode.com/100MB-mumbai1.bin
 */
 package main
 
@@ -36,6 +39,7 @@ var (
 	mtrReportTable      = "mtr_report"
 	downloadReportTable = "download_report"
 	reportTable         = "final_report"
+	vendor              = "vultr"
 )
 
 func init() {
@@ -52,6 +56,7 @@ func init() {
 	optDBUser := getopt.String('u', "gpadmin", "dbuser")
 	optDBPassword := getopt.String('p', "abc123", "password")
 	optDBPort := getopt.String('P', "5432", "port of DB")
+	optVendor := getopt.String('v', "vultr", "the vendor of the VPS, default is vultr")
 
 	getopt.Parse()
 	enableDebug = *optDebug
@@ -62,6 +67,7 @@ func init() {
 	dbUser = *optDBUser
 	dbPassword = *optDBPassword
 	dbPort = *optDBPort
+	vendor = *optVendor
 
 	if *optHelp {
 		getopt.Usage()
@@ -75,21 +81,21 @@ func main() {
 	checkRequirement()
 
 	// step2: get the url list from vultr.com
-	allTestLink := getURL()
+	allTestLink := getURL(vendor)
 
 	// step3: run mtr against all site, save the result to csv. this has to be done at local mac so the result is real
 	csvReport := mtrTest(allTestLink, outputFile)
 
-	// stepx: connect to db
+	// step4: connect to db
 	connectDB()
 
-	// stepx: load the csv to DB
+	// step5: load the csv to DB
 	loadCsvToDB(csvReport)
 
-	// stepx: test the speed of the download against each site
-	testDownloadSpeed(allTestLink, testTime)
+	// step6: test the speed of the download against each site
+	testDownloadSpeed(allTestLink, testTime, vendor)
 
-	// step5: load the data into db and get the result
+	// step7: load the data into db and get the result
 	generateReport(csvReport, testTime)
 
 }
@@ -126,7 +132,7 @@ func runQueryWithNoOutput(query string) {
 	}
 }
 
-func testDownloadSpeed(targetSites []string, testTimeStamp string) {
+func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string) {
 
 	testDuration := 10 // test download for x secs
 	downloadSpeed := "n/a"
@@ -144,6 +150,15 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string) {
 	runQueryWithNoOutput("truncate " + downloadReportTable)
 	for _, testURL := range targetSites {
 
+		switch vendor {
+		case "vultr":
+			plog("INFO", "testing download speed for link: "+testURL)
+		case "linode": // http://speedtest.toronto1.linode.com  -> http://speedtest.mumbai1.linode.com/100MB-mumbai1.bin
+			fileName := strings.Split(testURL, ".")[1]
+			testURL = testURL + "/100MB-" + fileName + ".bin"
+		default:
+			plog("FATAL", "unsupported vendor ["+vendor+"], exit!")
+		}
 		hostName := strings.Split(testURL, "/")[2]
 		// fmt.Println(testUrl)
 		plog("INFO", "Tesring download speed of ["+hostName+"]...")
@@ -163,7 +178,7 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string) {
 				plog("ERROR", "Failed to get download speed for site ["+testURL+"]...")
 			}
 		}
-		insertQuery := "insert into " + downloadReportTable + " values('" + testTimeStamp + "', '" + hostName + "','" + downloadSpeed + "')"
+		insertQuery := "insert into " + downloadReportTable + " values('" + testTimeStamp + "', '" + vendor + "', '" + hostName + "', '" + downloadSpeed + "')"
 		runQueryWithNoOutput(insertQuery)
 	}
 
@@ -173,13 +188,14 @@ func generateReport(csvFile string, date string) {
 
 	InsertReportQuery := `insert into ` + reportTable + ` 
     select 
-        to_timestamp(testdate, 'YYYY-MM-DD HH24:MI')::timestamp as testDate,
+		to_timestamp(testdate, 'YYYY-MM-DD HH24:MI')::timestamp as testDate,
+		vendor,
         hostname,
         result::int as Speed,
         avg_lossrate,
         max_lossrate,
-        max_latency,
-        avg_latency
+		avg_latency,
+		max_latency
     from 
         (select host as hostname,
             max(lossrate) as max_lossrate, 
@@ -203,7 +219,8 @@ func generateReport(csvFile string, date string) {
 		max_latency 
 	from ` + reportTable + ` 
 	where testdate = '` + date + `'
-	order by 2 desc,4`
+	and vendor = '` + vendor + `'
+	order by 4 desc`
 
 	plog("DEBUG", "will run query ["+getReportQuery+"]")
 	rows, queryErr := db.Query(getReportQuery)
@@ -239,6 +256,7 @@ func checkRequirement() {
 /* test the speed with mtr against each site of the url, save the output into local storage as csv format */
 func mtrTest(urls []string, outputFolder string) (csvFile string) {
 
+	testDuration := "1"
 	curTime := time.Now()
 	nowDate := curTime.Format("2006-01-01_15-04-05")
 	outputFile := outputFolder + "/" + "speedTestReport_" + nowDate + ".csv"
@@ -248,7 +266,7 @@ func mtrTest(urls []string, outputFolder string) (csvFile string) {
 		targetSite := strings.Split(url, "/")[2]
 		// plog("INFO", "Working on site: ["+targetSite+"]...")
 		plog("INFO", "Calling mtr to test the speed of site: ["+targetSite+"]...")
-		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c 60 -C | grep -v \"^Mtr_Version\" " // send 60 pings to target site
+		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c " + testDuration + " -C | grep -v \"^Mtr_Version\" " // send 60 pings to target site
 		resultCSV := runCommand(testCommand, false) + "\n"
 
 		/* write the output to outputFile */
@@ -266,11 +284,23 @@ func mtrTest(urls []string, outputFolder string) (csvFile string) {
 	/*csv header: Mtr_Version,Start_Time,Status,Host,Hop,Ip,Loss%,Snt, ,Last,Avg,Best,Wrst,StDev, */
 	return outputFile
 }
-func getURL() (listOfURL []string) {
+func getURL(vendor string) (listOfURL []string) {
 
-	plog("INFO", "Getting the URL list, please input the password for sudo when prompt...")
-	cmd := "curl -s https://www.vultr.com/resources/faq/#downloadspeedtests | grep 100MB | awk -F 'href=' '{print $2}' | grep -v ipv6 | grep https | awk '{print $1}' | sed 's/\\\"//g'"
-	curlOutput := runCommand(cmd, true)
+	getLinkCmd := ""
+	switch vendor {
+	case "vultr":
+		getLinkCmd = "curl -s https://www.vultr.com/resources/faq/#downloadspeedtests | grep 100MB | awk -F 'href=' '{print $2}' | grep -v ipv6 | grep https | awk '{print $1}' | sed 's/\\\"//g'"
+		plog("DEBUG", "will check the vultr site, command: "+getLinkCmd)
+	case "linode":
+		getLinkCmd = ` curl -s https://www.linode.com/speed-test/ | grep o-button | grep 'speedtest'  | awk '{print $4}' | awk -F'=' '{print $2}' | sed 's/\"//g' | sed 's/\/$//g'`
+		plog("DEBUG", "will check the linode site, command: "+getLinkCmd)
+	default:
+		plog("FATAL", "unsupported vendor ["+vendor+"], exit!")
+	}
+
+	// plog("INFO", "Getting the URL list, please input the password for sudo when prompt...")
+	// cmd := "curl -s https://www.vultr.com/resources/faq/#downloadspeedtests | grep 100MB | awk -F 'href=' '{print $2}' | grep -v ipv6 | grep https | awk '{print $1}' | sed 's/\\\"//g'"
+	curlOutput := runCommand(getLinkCmd, true)
 	if len(curlOutput) == 0 {
 		plog("FATAL", "curl command failed, Unable to get site list from vultr.com, please check the URL!")
 	}

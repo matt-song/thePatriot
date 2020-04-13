@@ -24,6 +24,7 @@ create table mtr_report (
 drop table if exists download_report;
 create table download_report (
     testdate    varchar(50),
+    vendor      varchar(50),
     host        varchar(50),
     result      varchar(50)
 ) DISTRIBUTED BY (host);
@@ -31,6 +32,7 @@ create table download_report (
 drop table if exists final_report;
 create table final_report (
     testDate        timestamp,
+    vendor          varchar(50),
     hostname        varchar(50),
     Speed           int,
     avg_lossrate    NUMERIC(100,2),
