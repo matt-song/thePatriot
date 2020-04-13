@@ -51,7 +51,7 @@ func init() {
 	optDBUser := getopt.String('u', "gpadmin", "the user of DB, default:")
 	optDBPassword := getopt.String('p', "abc123", "the password of DB user, default:")
 	optDBPort := getopt.String('P', "5432", "the port of DB, default:")
-	optVendor := getopt.String('v', "vultr", "the vendor of the VPS, default:")
+	optVendor := getopt.String('v', "vultr", "the vendor of the VPS, aviliable: vultr, linode; default:")
 
 	getopt.Parse()
 	enableDebug = *optDebug
