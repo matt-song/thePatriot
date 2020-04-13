@@ -21,17 +21,17 @@ A tool that test the network performance from your local ISP to VPS provider
 
 ## example output 
 ```HostName                           speed(KB/s)     avgLossRate     maxLossRate      avgLatency      maxLatency
-speedtest.dallas.linode.com                 29            0.00            0.00          294.41          294.41
-speedtest.fremont.linode.com                50            0.00            0.00          324.07          324.07
-speedtest.toronto1.linode.com               75            0.00            0.00          361.00          361.00
-speedtest.tokyo2.linode.com                 96            0.00            0.00          129.43          129.43
-speedtest.syd1.linode.com                  108            0.00            0.00          250.65          250.65
-speedtest.mumbai1.linode.com              1006            0.00            0.00          546.20          546.20
-speedtest.frankfurt.linode.com            2297            0.00            0.00          420.23          420.23
-speedtest.atlanta.linode.com                 4            0.00            0.00          319.00          319.00
-speedtest.singapore.linode.com             172            0.00            0.00          190.31          190.31
-speedtest.london.linode.com                234            0.00            0.00          403.07          403.07
-speedtest.newark.linode.com                 38            0.00            0.00          384.97          384.97
+speedtest.london.linode.com               2976            0.00            0.00          410.47          410.47
+speedtest.mumbai1.linode.com              1821            0.00            0.00          570.49          570.49
+speedtest.tokyo2.linode.com                233            0.00            0.00          120.55          120.55
+speedtest.syd1.linode.com                  154            0.00            0.00          242.73          242.73
+speedtest.singapore.linode.com             133            0.00            0.00          190.38          190.38
+speedtest.newark.linode.com                 55            0.00            0.00          365.82          365.82
+speedtest.toronto1.linode.com               53            0.00            0.00          356.20          356.20
+speedtest.dallas.linode.com                 51            0.00            0.00          303.25          303.25
+speedtest.fremont.linode.com                46            0.00            0.00          328.64          328.64
+speedtest.atlanta.linode.com                 6            0.00            0.00          339.58          339.58
+speedtest.frankfurt.linode.com               5            0.00            0.00          419.28          419.28```
 
 ## to query the histrionic data 
 ```# select * from final_report where vendor = 'linode' and hostname = 'speedtest.tokyo2.linode.com' order by 1;
