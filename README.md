@@ -21,23 +21,42 @@ A tool that test the network performance from your local ISP to VPS provider
 3. download the files from each site and test the speed
 4. store all info into DB
 
-## example output 
+## How to use:
+1. Connect your PC/Laptop with the network you want to check.
+2. run the tool. use -H to check the help message
+```
+$ go run generate_raw_result_csv.go -H
+Usage: generate_raw_result_csv [-DH] [-b value] [-d value] [-h value] [-o value] [-P value] [-p value] [-u value] [-v value] [parameters ...]
+ -b value  Folder which holds the mtr binary, default:
+           [/usr/local/sbin]
+ -D        Display debug message
+ -d value  Database to connect [thePatriot]
+ -H        Help
+ -h value  Database to connect [aio1]
+ -o value  The output of the result, default: [.]
+ -P value  port of DB [5432]
+ -p value  password [abc123]
+ -u value  dbuser [gpadmin]
+ -v value  the vendor of the VPS, default is vultr [vultr]
+ ```
+
+## Example output 
 ```
 HostName                           speed(KB/s)     avgLossRate     maxLossRate      avgLatency      maxLatency
-speedtest.london.linode.com               2976            0.00            0.00          410.47          410.47
-speedtest.mumbai1.linode.com              1821            0.00            0.00          570.49          570.49
-speedtest.tokyo2.linode.com                233            0.00            0.00          120.55          120.55
-speedtest.syd1.linode.com                  154            0.00            0.00          242.73          242.73
-speedtest.singapore.linode.com             133            0.00            0.00          190.38          190.38
-speedtest.newark.linode.com                 55            0.00            0.00          365.82          365.82
-speedtest.toronto1.linode.com               53            0.00            0.00          356.20          356.20
-speedtest.dallas.linode.com                 51            0.00            0.00          303.25          303.25
-speedtest.fremont.linode.com                46            0.00            0.00          328.64          328.64
-speedtest.atlanta.linode.com                 6            0.00            0.00          339.58          339.58
-speedtest.frankfurt.linode.com               5            0.00            0.00          419.28          419.28```
+speedtest.mumbai1.linode.com               730            8.55           28.33          636.28         1300.90
+speedtest.london.linode.com                137           13.33           50.00          402.36          441.55
+speedtest.tokyo2.linode.com                116           11.92           85.00          121.68          243.73
+speedtest.dallas.linode.com                 69           12.75           36.67          326.22          369.53
+speedtest.toronto1.linode.com               58           10.00           28.33          365.44          414.16
+speedtest.singapore.linode.com              56           10.72           81.67          190.66          211.93
+speedtest.newark.linode.com                 50           11.05           30.00          375.91          408.86
+speedtest.syd1.linode.com                   38            9.17           76.67          239.61          368.38
+speedtest.fremont.linode.com                32           11.19           30.00          346.69          406.11
+speedtest.frankfurt.linode.com               5           11.14           31.67          419.76          448.96
+speedtest.atlanta.linode.com                 5           14.41           91.67          347.22          474.48
 ```
 
-## to query the historical data 
+## To query the historical data from DB, check the table final_report
 ```
 # select * from final_report where vendor = 'linode' and hostname = 'speedtest.tokyo2.linode.com' order by 1;
       testdate       | vendor |          hostname           | speed | avg_lossrate | max_lossrate | avg_latency | max_latency

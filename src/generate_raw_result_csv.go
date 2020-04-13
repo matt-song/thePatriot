@@ -251,7 +251,7 @@ func checkRequirement() {
 /* test the speed with mtr against each site of the url, save the output into local storage as csv format */
 func mtrTest(urls []string, outputFolder string) (csvFile string) {
 
-	testDuration := "1"
+	testDuration := "60" // how long will mtr take to check the network.
 	curTime := time.Now()
 	nowDate := curTime.Format("2006-01-01_15-04-05")
 	outputFile := outputFolder + "/" + "speedTestReport_" + nowDate + ".csv"
