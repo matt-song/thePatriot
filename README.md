@@ -14,9 +14,10 @@ A tool that test the network performance from your local ISP to VPS provider
 ```# some command here [TBD]```
 
 ## How it works: 
-1. get the path of the route and test the latency,package drop rate from local to VPS provider
-2. download the files from each site and test the speed
-3. store all info into DB
+1. Get the url for speed test from VPS vendor
+2. get the path of the route and test the latency,package drop rate from local to each node.
+3. download the files from each site and test the speed
+4. store all info into DB
 
 ## example output 
 ```HostName                           speed(KB/s)     avgLossRate     maxLossRate      avgLatency      maxLatency

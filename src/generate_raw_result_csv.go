@@ -220,7 +220,7 @@ func generateReport(csvFile string, date string) {
 	from ` + reportTable + ` 
 	where testdate = '` + date + `'
 	and vendor = '` + vendor + `'
-	order by 4 desc`
+	order by 2 desc`
 
 	plog("DEBUG", "will run query ["+getReportQuery+"]")
 	rows, queryErr := db.Query(getReportQuery)
