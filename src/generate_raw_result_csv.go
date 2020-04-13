@@ -3,11 +3,6 @@ TBD:
 1. change the program from single thread to muliple thread.
 2. find a better way to import the csv to db
 3. consider to get rid of gpdb, use local db file instead.
-4. re-write the sql so it can only query the current date (where date=xxxxx)
-5. adding download speed test
-6. adding test for linnode
- curl -s https://www.linode.com/speed-test/ | grep o-button | grep 'speedtest'  | awk '{print $4}' | awk -F'=' '{print $2}' | sed 's/\"//g' | sed 's/\/$//g'
-http://speedtest.mumbai1.linode.com/100MB-mumbai1.bin
 */
 package main
 
