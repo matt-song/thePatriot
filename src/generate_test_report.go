@@ -167,9 +167,14 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string
 			match, _ := regexp.MatchString("([0-9]+)", downloadedSizeString)
 			if match {
 				downloadedSize, _ := strconv.Atoi(downloadedSizeString)
-				downloadSpeed = strconv.Itoa(downloadedSize / testDuration / 1024)
+				if downloadedSize > 0 {
+					downloadSpeed = strconv.Itoa(downloadedSize / testDuration / 1024)
+				} else {
+					downloadSpeed = "0"
+				}
 			} else {
 				plog("ERROR", "Failed to get download speed for site ["+testURL+"]...")
+				downloadSpeed = "0"
 			}
 		}
 		insertQuery := "insert into " + downloadReportTable + " values('" + testTimeStamp + "', '" + vendor + "', '" + hostName + "', '" + downloadSpeed + "')"
@@ -186,6 +191,7 @@ func generateReport(csvFile string, date string) {
 		vendor,
         hostname,
         result::int as Speed,
+        CASE when result > 0 then result::int ELSE 0 END as Speed, 
         avg_lossrate,
         max_lossrate,
 		avg_latency,
@@ -260,7 +266,7 @@ func mtrTest(urls []string, outputFolder string) (csvFile string) {
 		targetSite := strings.Split(url, "/")[2]
 		// plog("INFO", "Working on site: ["+targetSite+"]...")
 		plog("INFO", "Calling mtr to test the speed of site: ["+targetSite+"]...")
-		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c " + testDuration + " -C | grep -v \"^Mtr_Version\" " // send 60 pings to target site
+		testCommand := "cd " + mtrFolder + "; sudo " + mtrFolder + "/mtr " + targetSite + " -r -w -c " + testDuration + " -C | grep -v \"^Mtr_Version\" | sed 's/;/,/g' " // send 60 pings to target site
 		resultCSV := runCommand(testCommand, false) + "\n"
 
 		/* write the output to outputFile */
