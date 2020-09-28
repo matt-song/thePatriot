@@ -39,6 +39,4 @@ create table final_report (
 ) DISTRIBUTED BY (hostname);
 
 
-/* -- query -- 
-
-*/
+/* -- query -- */
