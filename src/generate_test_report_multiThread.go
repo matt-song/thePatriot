@@ -170,6 +170,7 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string
 		hostName := strings.Split(testURL, "/")[2]
 		getFileCMD := "curl " + testURL + " -o /dev/null -m " + strconv.Itoa(testDuration) + " 2>&1 | grep 'Operation timed out'"
 		downloadSummary := runCommand(getFileCMD, false)
+		plog("DEBUG", "The downloadSummary is ["+downloadSummary+"]")
 
 		if len(downloadSummary) == 0 { // download finished within x sec
 			downloadSpeed = string(fileSize / testDuration / 1024)
@@ -196,6 +197,11 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string
 
 func generateReport(csvFile string, date string) {
 
+	plog("INFO", "Clean up invalid result from download report...")
+	cleanUpQuery := `update ` + downloadReportTable + ` set result = 0 where result !~ '^[0-9]+$';`
+	runQueryWithNoOutput(cleanUpQuery)
+
+	plog("INFO", "Generating final report table...")
 	InsertReportQuery := `insert into ` + reportTable + ` 
     select 
 		to_timestamp(testdate, 'YYYY-MM-DD HH24:MI')::timestamp as testDate,
@@ -221,6 +227,7 @@ func generateReport(csvFile string, date string) {
 	order by max_lossrate,Speed;`
 	runQueryWithNoOutput(InsertReportQuery)
 
+	plog("INFO", "Generating final report...")
 	getReportQuery := `select 
 		hostname,
 		speed,
