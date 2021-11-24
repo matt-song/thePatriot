@@ -173,8 +173,10 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string
 		plog("DEBUG", "The downloadSummary is ["+downloadSummary+"]")
 
 		if len(downloadSummary) == 0 { // download finished within x sec
-			downloadSpeed = string(fileSize / testDuration / 1024)
+			downloadSpeed = strconv.Itoa(fileSize / testDuration / 1024)
+			plog("DEBUG", "The download for site "+hostName+" has finsished, downloadSummary is ["+downloadSummary+"]")
 		} else {
+			plog("DEBUG", "The download for site "+hostName+" has not finsished, downloadSummary is ["+downloadSummary+"]")
 			downloadedSizeString := strings.Split(downloadSummary, " ")[9]
 			// check if the output is number
 			match, _ := regexp.MatchString("([0-9]+)", downloadedSizeString)
@@ -186,6 +188,7 @@ func testDownloadSpeed(targetSites []string, testTimeStamp string, vendor string
 					downloadSpeed = "0"
 				}
 			} else {
+				plog("DEBUG", "The download for site "+hostName+" has finsished, something goes wrong, set speed as 0")
 				plog("ERROR", "Failed to get download speed for site ["+testURL+"]...")
 				downloadSpeed = "0"
 			}
