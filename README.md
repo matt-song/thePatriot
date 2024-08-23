@@ -9,6 +9,12 @@ A tool that test the network performance from your local ISP to VPS provider
 ## Requirement:
 - Tools must be installed: mtr, curl..
 - A postgres DB must be aviliable for storing the data (will add --nosql mode in future)
+- below module must be installed
+```
+go mod init speedtest
+go get github.com/lib/pq
+go get github.com/pborman/getopt/v2
+```
 
 ## How to build from source:
 ```
